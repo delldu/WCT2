@@ -56,16 +56,20 @@ class WCT2:
         self.decoder = WaveDecoder(option_unpool).to(self.device)
         self.encoder.load_state_dict(torch.load(os.path.join(model_path, 'wave_encoder_{}_l4.pth'.format(option_unpool)), map_location=lambda storage, loc: storage))
         self.decoder.load_state_dict(torch.load(os.path.join(model_path, 'wave_decoder_{}_l4.pth'.format(option_unpool)), map_location=lambda storage, loc: storage))
+        self.encoder.eval()
+        self.decoder.eval()
 
     def print_(self, msg):
         if self.verbose:
             print(msg)
 
     def encode(self, x, skips, level):
-        return self.encoder.encode(x, skips, level)
+        with torch.no_grad():
+            return self.encoder.encode(x, skips, level)
 
     def decode(self, x, skips, level):
-        return self.decoder.decode(x, skips, level)
+        with torch.no_grad():
+            return self.decoder.decode(x, skips, level)
 
     def get_all_feature(self, x):
         skips = {}
