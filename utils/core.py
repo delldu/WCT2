@@ -6,7 +6,7 @@ Licensed under the CC BY-NC-SA 4.0
 import torch
 import numpy as np
 from PIL import Image
-
+import pdb
 
 def svd(feat, iden=False, device='cpu'):
     size = feat.size()
@@ -46,6 +46,9 @@ def wct_core(cont_feat, styl_feat, weight=1, registers=None, device='cpu'):
     cont_mean = torch.mean(cont_feat, 1).unsqueeze(1).expand_as(cont_feat)
     cont_feat -= cont_mean
 
+    # print("wct_core registers: ", registers, ", weight: ", weight)
+    # wct_core registers:  None , weight:  1
+
     if not registers:
         _, c_e, c_v = svd(cont_feat, iden=True, device=device)
 
@@ -56,12 +59,14 @@ def wct_core(cont_feat, styl_feat, weight=1, registers=None, device='cpu'):
         s_d = (s_e[0:k_s]).pow(0.5)
         EDE = torch.mm(torch.mm(s_v[:, 0:k_s], torch.diag(s_d) * weight), (s_v[:, 0:k_s].t()))
 
-        if registers is not None:
+        if registers is not None: # False
             registers['EDE'] = EDE
             registers['s_mean'] = s_mean
             registers['c_v'] = c_v
             registers['c_e'] = c_e
     else:
+        pdb.set_trace()
+
         EDE = registers['EDE']
         s_mean = registers['s_mean']
         _, c_e, c_v = svd(cont_feat, iden=True, device=device)

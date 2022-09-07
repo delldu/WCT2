@@ -23,7 +23,7 @@ THE SOFTWARE.
 import torch
 import torch.nn as nn
 import numpy as np
-
+import pdb
 
 def get_wav(in_channels, pool=True):
     """wavelet decomposition using conv2d"""
@@ -75,7 +75,7 @@ def get_wav(in_channels, pool=True):
 class WavePool(nn.Module):
     def __init__(self, in_channels):
         super(WavePool, self).__init__()
-        self.LL, self.LH, self.HL, self.HH = get_wav(in_channels)
+        self.LL, self.LH, self.HL, self.HH = get_wav(in_channels, pool=True)
 
     def forward(self, x):
         return self.LL(x), self.LH(x), self.HL(x), self.HH(x)

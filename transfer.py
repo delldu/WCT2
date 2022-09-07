@@ -25,13 +25,14 @@ import tqdm
 import argparse
 
 import torch
+import torch.nn as nn
 from torchvision.utils import save_image
 
 from model import WaveEncoder, WaveDecoder
 
 from utils.core import feature_wct
 from utils.io import Timer, open_image, load_segment, compute_label_info
-
+import pdb
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -43,10 +44,12 @@ def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
 
-class WCT2:
+class WCT2(nn.Module):
     def __init__(self, model_path='./model_checkpoints', transfer_at=['encoder', 'skip', 'decoder'], option_unpool='cat5', device='cuda:0', verbose=False):
+        super(WCT2, self).__init__()
 
         self.transfer_at = set(transfer_at)
+        # self.transfer_at -- 'decoder'
         assert not(self.transfer_at - set(['encoder', 'decoder', 'skip'])), 'invalid transfer_at: {}'.format(transfer_at)
         assert self.transfer_at, 'empty transfer_at'
 
@@ -58,6 +61,8 @@ class WCT2:
         self.decoder.load_state_dict(torch.load(os.path.join(model_path, 'wave_decoder_{}_l4.pth'.format(option_unpool)), map_location=lambda storage, loc: storage))
         self.encoder.eval()
         self.decoder.eval()
+
+        # torch.save(self.state_dict(), "/tmp/image_photo_style.pth")
 
     def print_(self, msg):
         if self.verbose:
@@ -89,21 +94,25 @@ class WCT2:
 
     def transfer(self, content, style, content_segment, style_segment, alpha=1):
         label_set, label_indicator = compute_label_info(content_segment, style_segment)
+        # pp label_set, label_indicator -- (None, None)
+
         content_feat, content_skips = content, {}
         style_feats, style_skips = self.get_all_feature(style)
 
-        wct2_enc_level = [1, 2, 3, 4]
-        wct2_dec_level = [1, 2, 3, 4]
+        # wct2_enc_level = [1, 2, 3, 4]
+        # wct2_dec_level = [1, 2, 3, 4]
         wct2_skip_level = ['pool1', 'pool2', 'pool3']
 
         for level in [1, 2, 3, 4]:
             content_feat = self.encode(content_feat, content_skips, level)
-            if 'encoder' in self.transfer_at and level in wct2_enc_level:
+            # if 'encoder' in self.transfer_at and level in wct2_enc_level:
+            if 'encoder' in self.transfer_at:
                 content_feat = feature_wct(content_feat, style_feats['encoder'][level],
                                            content_segment, style_segment,
                                            label_set, label_indicator,
                                            alpha=alpha, device=self.device)
                 self.print_('transfer at encoder {}'.format(level))
+
         if 'skip' in self.transfer_at:
             for skip_level in wct2_skip_level:
                 for component in [0, 1, 2]:  # component: [LH, HL, HH]
@@ -114,7 +123,8 @@ class WCT2:
                 self.print_('transfer at skip {}'.format(skip_level))
 
         for level in [4, 3, 2, 1]:
-            if 'decoder' in self.transfer_at and level in style_feats['decoder'] and level in wct2_dec_level:
+            # if 'decoder' in self.transfer_at and level in style_feats['decoder'] and level in wct2_dec_level:
+            if 'decoder' in self.transfer_at and level in style_feats['decoder']:
                 content_feat = feature_wct(content_feat, style_feats['decoder'][level],
                                            content_segment, style_segment,
                                            label_set, label_indicator,
@@ -170,11 +180,12 @@ def run_bulk(config):
         style_segment = load_segment(_style_segment, config.image_size)     
         _, ext = os.path.splitext(fname)
         
-        if not config.transfer_all:
+        if not config.transfer_all: # True ?
             with Timer('Elapsed time in whole WCT: {}', config.verbose):
                 postfix = '_'.join(sorted(list(transfer_at)))
                 fname_output = _output.replace(ext, '_{}_{}.{}'.format(config.option_unpool, postfix, ext))
                 print('------ transfer:', _output)
+                # transfer_at -- {'decoder'}
                 wct2 = WCT2(transfer_at=transfer_at, option_unpool=config.option_unpool, device=device, verbose=config.verbose)
                 with torch.no_grad():
                     img = wct2.transfer(content, style, content_segment, style_segment, alpha=config.alpha)
