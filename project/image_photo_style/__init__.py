@@ -39,7 +39,7 @@ def get_model():
     model.eval()
 
 
-    # model = torch.jit.script(model)
+    model = torch.jit.script(model)
 
     # todos.data.mkdir("output")
     # if not os.path.exists("output/image_photo_style.torch"):
