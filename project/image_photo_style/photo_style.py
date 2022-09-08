@@ -17,6 +17,7 @@ from typing import List, Dict
 import numpy as np
 import pdb
 
+
 def svd(feat):
     size = feat.size()
     mean = torch.mean(feat, 1)
@@ -38,7 +39,7 @@ def get_squeeze_feat(feat):
     return _feat.view(size, -1).clone()
 
 
-def get_rank(singular_values, dim: int, eps: float=0.00001) -> int:
+def get_rank(singular_values, dim: int, eps: float = 0.00001) -> int:
     r = dim
     for i in range(dim - 1, -1, -1):
         if singular_values[i] >= eps:
@@ -107,18 +108,10 @@ def get_wav(in_channels, pool=True):
     else:
         net = nn.ConvTranspose2d
 
-    LL = net(in_channels, in_channels,
-             kernel_size=2, stride=2, padding=0, bias=False,
-             groups=in_channels)
-    LH = net(in_channels, in_channels,
-             kernel_size=2, stride=2, padding=0, bias=False,
-             groups=in_channels)
-    HL = net(in_channels, in_channels,
-             kernel_size=2, stride=2, padding=0, bias=False,
-             groups=in_channels)
-    HH = net(in_channels, in_channels,
-             kernel_size=2, stride=2, padding=0, bias=False,
-             groups=in_channels)
+    LL = net(in_channels, in_channels, kernel_size=2, stride=2, padding=0, bias=False, groups=in_channels)
+    LH = net(in_channels, in_channels, kernel_size=2, stride=2, padding=0, bias=False, groups=in_channels)
+    HL = net(in_channels, in_channels, kernel_size=2, stride=2, padding=0, bias=False, groups=in_channels)
+    HH = net(in_channels, in_channels, kernel_size=2, stride=2, padding=0, bias=False, groups=in_channels)
 
     LL.weight.requires_grad = False
     LH.weight.requires_grad = False
@@ -153,7 +146,8 @@ class WaveUnpool(nn.Module):
 
 
 class WaveEncoder(nn.Module):
-    ''' cat5 '''
+    """cat5"""
+
     def __init__(self):
         super(WaveEncoder, self).__init__()
         self.pad = nn.ReflectionPad2d(1)
@@ -192,23 +186,23 @@ class WaveEncoder(nn.Module):
 
         elif level == 2:
             out = self.relu(self.conv1_2(self.pad(x)))
-            skips['conv1_2'] = out
+            skips["conv1_2"] = out
             LL, LH, HL, HH = self.pool1(out)
             # skips['pool1'] = [LH, HL, HH] # LL not in this pool
-            skips['pool1_LH'] = LH
-            skips['pool1_HL'] = HL
-            skips['pool1_HH'] = HH
+            skips["pool1_LH"] = LH
+            skips["pool1_HL"] = HL
+            skips["pool1_HH"] = HH
             out = self.relu(self.conv2_1(self.pad(LL)))
             return out
 
         elif level == 3:
             out = self.relu(self.conv2_2(self.pad(x)))
-            skips['conv2_2'] = out
+            skips["conv2_2"] = out
             LL, LH, HL, HH = self.pool2(out)
             # skips['pool2'] = [LH, HL, HH] # LL not in this pool
-            skips['pool2_LH'] = LH
-            skips['pool2_HL'] = HL
-            skips['pool2_HH'] = HH
+            skips["pool2_LH"] = LH
+            skips["pool2_HL"] = HL
+            skips["pool2_HH"] = HH
             out = self.relu(self.conv3_1(self.pad(LL)))
             return out
 
@@ -216,17 +210,19 @@ class WaveEncoder(nn.Module):
             out = self.relu(self.conv3_2(self.pad(x)))
             out = self.relu(self.conv3_3(self.pad(out)))
             out = self.relu(self.conv3_4(self.pad(out)))
-            skips['conv3_4'] = out
+            skips["conv3_4"] = out
             LL, LH, HL, HH = self.pool3(out)
             # skips['pool3'] = [LH, HL, HH] # LL not in this pool
-            skips['pool3_LH'] = LH
-            skips['pool3_HL'] = HL
-            skips['pool3_HH'] = HH
+            skips["pool3_LH"] = LH
+            skips["pool3_HL"] = HL
+            skips["pool3_HH"] = HH
             out = self.relu(self.conv4_1(self.pad(LL)))
             return out
 
+
 class WaveDecoder(nn.Module):
-    '''cat5'''
+    """cat5"""
+
     def __init__(self):
         super(WaveDecoder, self).__init__()
 
@@ -236,17 +232,17 @@ class WaveDecoder(nn.Module):
         self.conv4_1 = nn.Conv2d(512, 256, 3, 1, 0)
 
         self.recon_block3 = WaveUnpool(256)
-        self.conv3_4_2 = nn.Conv2d(256*multiply_in, 256, 3, 1, 0)
+        self.conv3_4_2 = nn.Conv2d(256 * multiply_in, 256, 3, 1, 0)
         self.conv3_3 = nn.Conv2d(256, 256, 3, 1, 0)
         self.conv3_2 = nn.Conv2d(256, 256, 3, 1, 0)
         self.conv3_1 = nn.Conv2d(256, 128, 3, 1, 0)
 
         self.recon_block2 = WaveUnpool(128)
-        self.conv2_2_2 = nn.Conv2d(128*multiply_in, 128, 3, 1, 0)
+        self.conv2_2_2 = nn.Conv2d(128 * multiply_in, 128, 3, 1, 0)
         self.conv2_1 = nn.Conv2d(128, 64, 3, 1, 0)
 
         self.recon_block1 = WaveUnpool(64)
-        self.conv1_2_2 = nn.Conv2d(64*multiply_in, 64, 3, 1, 0)
+        self.conv1_2_2 = nn.Conv2d(64 * multiply_in, 64, 3, 1, 0)
         self.conv1_1 = nn.Conv2d(64, 3, 3, 1, 0)
 
     def forward(self, x, skips: Dict[str, torch.Tensor]):
@@ -259,96 +255,76 @@ class WaveDecoder(nn.Module):
         if level == 4:
             out = self.relu(self.conv4_1(self.pad(x)))
             # LH, HL, HH = skips['pool3']
-            LH = skips['pool3_LH']
-            HL = skips['pool3_HL']
-            HH = skips['pool3_HH']
+            LH = skips["pool3_LH"]
+            HL = skips["pool3_HL"]
+            HH = skips["pool3_HH"]
             # original = skips['conv3_4'] if 'conv3_4' in skips.keys() else None
             # out = self.recon_block3(out, LH, HL, HH, original)
-            out = self.recon_block3(out, LH, HL, HH, skips['conv3_4'])
+            out = self.recon_block3(out, LH, HL, HH, skips["conv3_4"])
             out = self.relu(self.conv3_4_2(self.pad(out)))
             out = self.relu(self.conv3_3(self.pad(out)))
             return self.relu(self.conv3_2(self.pad(out)))
         elif level == 3:
             out = self.relu(self.conv3_1(self.pad(x)))
             # LH, HL, HH = skips['pool2']
-            LH = skips['pool2_LH']
-            HL = skips['pool2_HL']
-            HH = skips['pool2_HH']
+            LH = skips["pool2_LH"]
+            HL = skips["pool2_HL"]
+            HH = skips["pool2_HH"]
             # original = skips['conv2_2'] if 'conv2_2' in skips.keys() else None
             # out = self.recon_block2(out, LH, HL, HH, original)
-            out = self.recon_block2(out, LH, HL, HH, skips['conv2_2'])
+            out = self.recon_block2(out, LH, HL, HH, skips["conv2_2"])
             return self.relu(self.conv2_2_2(self.pad(out)))
         elif level == 2:
             out = self.relu(self.conv2_1(self.pad(x)))
             # LH, HL, HH = skips['pool1']
-            LH = skips['pool1_LH']
-            HL = skips['pool1_HL']
-            HH = skips['pool1_HH']
+            LH = skips["pool1_LH"]
+            HL = skips["pool1_HL"]
+            HH = skips["pool1_HH"]
             # original = skips['conv1_2'] if 'conv1_2' in skips.keys() else None
             # out = self.recon_block1(out, LH, HL, HH, original)
-            out = self.recon_block1(out, LH, HL, HH, skips['conv1_2'])
+            out = self.recon_block1(out, LH, HL, HH, skips["conv1_2"])
             return self.relu(self.conv1_2_2(self.pad(out)))
         else:
             return self.conv1_1(self.pad(x))
 
+
 class WCT2(nn.Module):
     def __init__(self):
         super(WCT2, self).__init__()
-
-        # self.transfer_at = ['decoder']
-        # self.transfer_at -- 'decoder'
         self.encoder = WaveEncoder()
         self.decoder = WaveDecoder()
 
-    # def encode(self, x, skips, level):
-    #     with torch.no_grad():
-    #         return self.encoder.encode(x, skips, level)
-
-    # def decode(self, x, skips, level):
-    #     with torch.no_grad():
-    #         return self.decoder.decode(x, skips, level)
-
     def get_style_features(self, x, skips: Dict[str, torch.Tensor]) -> Dict[int, torch.Tensor]:
-        feats:Dict[int, torch.Tensor] = {}
+        feats: Dict[int, torch.Tensor] = {}
         for level in [1, 2, 3, 4]:
             x = self.encoder.encode(x, skips, level)
-            # if 'encoder' in self.transfer_at:
-            #     feats['encoder'][level] = x
-
-        # if 'encoder' not in self.transfer_at:
-        #     feats['decoder'][4] = x
         feats[4] = x
         for level in [4, 3, 2]:
             x = self.decoder.decode(x, skips, level)
-            # if 'decoder' in self.transfer_at:
-            #     feats['decoder'][level - 1] = x
             feats[level - 1] = x
 
-        # feats['encoder'] -- {}
-        # feats['decoder'].keys() -- dict_keys([4, 3, 2, 1])
-        # skips.keys() -- dict_keys(['conv1_2', 'pool1', 
-        #    'conv2_2', 'pool2', 'conv3_4', 'pool3'])
+        # feats.keys() -- dict_keys([4, 3, 2, 1])
+        # skips.keys() -- dict_keys(['conv1_2', 'pool1_LH|HL|HH',
+        #    'conv2_2', 'pool2_LH|HL|HH', 'conv3_4', 'pool3_LH|HL|HH'])
 
         return feats
 
     def forward(self, content, style):
-        # content_feat, content_skips = content, {}
         content_feat = content
-        content_skips:Dict[str, torch.Tensor] = {}
+        content_skips: Dict[str, torch.Tensor] = {}
 
         style_skips: Dict[str, torch.Tensor] = {}
         style_feats = self.get_style_features(style, style_skips)
-        # ==>style_skips.keys()--['conv1_2', 'pool1', 'conv2_2', 'pool2', 'conv3_4', 'pool3']
+        # ==>style_skips.keys()--['conv1_2',
+        # 'pool1_LH|HL|HH', 'conv2_2', 'pool2_LH|HL|HH', 'conv3_4', 'pool3_LH|HL|HH']
 
         for level in [1, 2, 3, 4]:
             content_feat = self.encoder.encode(content_feat, content_skips, level)
 
-        #==> content_skips.keys()--['conv1_2', 'pool1', 'conv2_2', 'pool2', 'conv3_4', 'pool3']
+        # ==> content_skips.keys()--['conv1_2',
+        # 'pool1_LH|HL|HH', 'conv2_2', 'pool2_LH|HL|HH', 'conv3_4', 'pool3_LH|HL|HH']
 
         for level in [4, 3, 2, 1]:
-            # if 'decoder' in self.transfer_at and level in style_feats:
-            #     content_feat = feature_wct(content_feat, style_feats[level], alpha=alpha)
-
             content_feat = feature_wct(content_feat, style_feats[level])
             content_feat = self.decoder.decode(content_feat, content_skips, level)
 

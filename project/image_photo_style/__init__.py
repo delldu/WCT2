@@ -13,6 +13,7 @@ __version__ = "1.0.0"
 
 import os
 import time
+import math
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -23,6 +24,7 @@ from . import photo_style
 
 import pdb
 
+PHOTO_STYLE_MULTI_TIMES = 8
 
 def get_model():
     """Create model."""
@@ -37,7 +39,6 @@ def get_model():
     device = todos.model.get_device()
     model = model.to(device)
     model.eval()
-
 
     model = torch.jit.script(model)
 
@@ -56,6 +57,7 @@ def model_forward(model, device, content_tensor, style_tensor):
 
     return output_tensor
 
+
 # def model_forward(model, device, input_tensor, multi_times):
 #     # zeropad for model
 #     H, W = input_tensor.size(2), input_tensor.size(3)
@@ -63,7 +65,6 @@ def model_forward(model, device, content_tensor, style_tensor):
 #         input_tensor = todos.data.zeropad_tensor(input_tensor, times=multi_times)
 #     output_tensor = todos.model.forward(model, device, input_tensor)
 #     return output_tensor[:, :, 0:H, 0:W]
-
 
 
 def image_client(name, input_files, output_dir):
@@ -113,13 +114,14 @@ def image_predict(input_files, style_file, output_dir):
 
         # orig input
         content_tensor = todos.data.load_tensor(filename)
-        content_tensor = F.interpolate(content_tensor, size=(512, 512), mode="bilinear", align_corners=False)
-        style_tensor = F.interpolate(style_tensor, size=(512, 512), mode="bilinear", align_corners=False)
-
-        # B, C, H, W = content_tensor.shape
-
-        # pytorch recommand clone.detach instead of torch.Tensor(content_tensor)
-        # orig_tensor = content_tensor.clone().detach()
+        B, C, H, W = content_tensor.shape
+        Hnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(H / PHOTO_STYLE_MULTI_TIMES))
+        Wnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(W / PHOTO_STYLE_MULTI_TIMES))
+        if Hnew != H or Wnew != W:
+            content_tensor = F.interpolate(content_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
+        B, C, H, W = style_tensor.shape
+        if Hnew != H or Wnew != W:
+            style_tensor = F.interpolate(style_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
 
         predict_tensor = model_forward(model, device, content_tensor, style_tensor)
         output_file = f"{output_dir}/{os.path.basename(filename)}"
