@@ -42,9 +42,9 @@ def get_model():
 
     model = torch.jit.script(model)
 
-    # todos.data.mkdir("output")
-    # if not os.path.exists("output/image_photo_style.torch"):
-    #     model.save("output/image_photo_style.torch")
+    todos.data.mkdir("output")
+    if not os.path.exists("output/image_photo_style.torch"):
+        model.save("output/image_photo_style.torch")
 
     return model, device
 
