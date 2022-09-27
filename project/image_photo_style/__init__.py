@@ -12,7 +12,6 @@
 __version__ = "1.0.0"
 
 import os
-import time
 import math
 from tqdm import tqdm
 import torch
@@ -25,6 +24,7 @@ from . import photo_style
 import pdb
 
 PHOTO_STYLE_MULTI_TIMES = 8
+
 
 def get_model():
     """Create model."""
@@ -40,6 +40,7 @@ def get_model():
     model = model.to(device)
     model.eval()
 
+    print(f"Running on {device} ...")
     model = torch.jit.script(model)
 
     todos.data.mkdir("output")
@@ -52,19 +53,14 @@ def get_model():
 def model_forward(model, device, content_tensor, style_tensor):
     content_tensor = content_tensor.to(device)
     style_tensor = style_tensor.to(device)
-    with torch.no_grad():
-        output_tensor = model(content_tensor, style_tensor)
+
+    torch.cuda.synchronize()
+    with torch.jit.optimized_execution(False):
+        with torch.no_grad():
+            output_tensor = model(content_tensor, style_tensor)
+    torch.cuda.synchronize()
 
     return output_tensor
-
-
-# def model_forward(model, device, input_tensor, multi_times):
-#     # zeropad for model
-#     H, W = input_tensor.size(2), input_tensor.size(3)
-#     if H % multi_times != 0 or W % multi_times != 0:
-#         input_tensor = todos.data.zeropad_tensor(input_tensor, times=multi_times)
-#     output_tensor = todos.model.forward(model, device, input_tensor)
-#     return output_tensor[:, :, 0:H, 0:W]
 
 
 def image_client(name, input_files, output_dir):
