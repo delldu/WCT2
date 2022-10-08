@@ -51,16 +51,7 @@ def get_model():
 
 
 def model_forward(model, device, content_tensor, style_tensor):
-    content_tensor = content_tensor.to(device)
-    style_tensor = style_tensor.to(device)
-
-    torch.cuda.synchronize()
-    with torch.jit.optimized_execution(False):
-        with torch.no_grad():
-            output_tensor = model(content_tensor, style_tensor)
-    torch.cuda.synchronize()
-
-    return output_tensor
+    return todos.model.two_forward(model, device, content_tensor, style_tensor)
 
 
 def image_client(name, input_files, output_dir):
