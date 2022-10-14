@@ -12,18 +12,14 @@
 __version__ = "1.0.0"
 
 import os
-import math
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 
-import redos
 import todos
 from . import photo_style
 
 import pdb
-
-PHOTO_STYLE_MULTI_TIMES = 8
 
 
 def get_model():
@@ -50,37 +46,15 @@ def get_model():
     return model, device
 
 
-def model_forward(model, device, content_tensor, style_tensor):
-    return todos.model.two_forward(model, device, content_tensor, style_tensor)
+def model_forward(model, device, content_tensor, style_tensor, multi_times=8):
+    # zeropad for model
+    H, W = content_tensor.size(2), content_tensor.size(3)
+    if H % multi_times != 0 or W % multi_times != 0:
+        content_tensor = todos.data.zeropad_tensor(content_tensor, times=multi_times)
 
+    output_tensor = todos.model.two_forward(model, device, content_tensor, style_tensor)
 
-def image_client(name, input_files, output_dir):
-    redo = redos.Redos(name)
-    cmd = redos.image.Command()
-    image_filenames = todos.data.load_files(input_files)
-    for filename in image_filenames:
-        output_file = f"{output_dir}/{os.path.basename(filename)}"
-        context = cmd.photo_style(filename, output_file)
-        redo.set_queue_task(context)
-    print(f"Created {len(image_filenames)} tasks for {name}.")
-
-
-def image_server(name, host="localhost", port=6379):
-    # load model
-    model, device = get_model()
-
-    def do_service(input_file, output_file, targ):
-        print(f"  photo_style {input_file} ...")
-        try:
-            content_tensor = todos.data.load_tensor(input_file)
-            output_tensor = model_forward(model, device, content_tensor)
-            todos.data.save_tensor(output_tensor, output_file)
-            return True
-        except Exception as e:
-            print("exception: ", e)
-            return False
-
-    return redos.image.service(name, "image_photo_style", do_service, host, port)
+    return output_tensor[:, :, 0:H, 0:W]
 
 
 def image_predict(input_files, style_file, output_dir):
@@ -102,69 +76,11 @@ def image_predict(input_files, style_file, output_dir):
         # orig input
         content_tensor = todos.data.load_tensor(filename)
         B, C, H, W = content_tensor.shape
-        Hnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(H / PHOTO_STYLE_MULTI_TIMES))
-        Wnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(W / PHOTO_STYLE_MULTI_TIMES))
-        if Hnew != H or Wnew != W:
-            content_tensor = F.interpolate(content_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
-        B, C, H, W = style_tensor.shape
-        if Hnew != H or Wnew != W:
-            style_tensor = F.interpolate(style_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
 
         predict_tensor = model_forward(model, device, content_tensor, style_tensor)
         output_file = f"{output_dir}/{os.path.basename(filename)}"
 
+        SB, SC, SH, SW = style_tensor.shape
+        if SH != H or SW != W:
+            style_tensor = F.interpolate(style_tensor, size=(H, W), mode="bilinear", align_corners=False)
         todos.data.save_tensor([content_tensor, style_tensor, predict_tensor], output_file)
-
-
-def video_service(input_file, output_file, targ):
-    # load video
-    video = redos.video.Reader(input_file)
-    if video.n_frames < 1:
-        print(f"Read video {input_file} error.")
-        return False
-
-    # Create directory to store result
-    output_dir = output_file[0 : output_file.rfind(".")]
-    todos.data.mkdir(output_dir)
-
-    # load model
-    model, device = get_model()
-
-    print(f"  photo_style {input_file}, save to {output_file} ...")
-    progress_bar = tqdm(total=video.n_frames)
-
-    def photo_style_video_frame(no, data):
-        # print(f"frame: {no} -- {data.shape}")
-        progress_bar.update(1)
-
-        content_tensor = todos.data.frame_totensor(data)
-
-        # convert tensor from 1x4xHxW to 1x3xHxW
-        content_tensor = content_tensor[:, 0:3, :, :]
-        output_tensor = model_forward(model, device, content_tensor)
-
-        temp_output_file = "{}/{:06d}.png".format(output_dir, no)
-        todos.data.save_tensor(output_tensor, temp_output_file)
-
-    video.forward(callback=photo_style_video_frame)
-
-    redos.video.encode(output_dir, output_file)
-
-    # delete temp files
-    for i in range(video.n_frames):
-        temp_output_file = "{}/{:06d}.png".format(output_dir, i)
-        os.remove(temp_output_file)
-
-    return True
-
-
-def video_client(name, input_file, output_file):
-    cmd = redos.video.Command()
-    context = cmd.photo_style(input_file, output_file)
-    redo = redos.Redos(name)
-    redo.set_queue_task(context)
-    print(f"Created 1 video tasks for {name}.")
-
-
-def video_server(name, host="localhost", port=6379):
-    return redos.video.service(name, "video_photo_style", video_service, host, port)

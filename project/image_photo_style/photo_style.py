@@ -310,6 +310,12 @@ class WCT2(nn.Module):
         return feats
 
     def forward(self, content, style):
+        H, W = style.size(2), style.size(3)
+        if H % 8 != 0 or W % 8 != 0:
+            H = 8 * (H // 8)
+            W = 8 * (W // 8)
+            style = style[:, :, 0:H, 0:W]
+
         content_feat = content
         content_skips: Dict[str, torch.Tensor] = {}
 
