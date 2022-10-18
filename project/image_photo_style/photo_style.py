@@ -334,4 +334,4 @@ class WCT2(nn.Module):
             content_feat = feature_wct(content_feat, style_feats[level])
             content_feat = self.decoder.decode(content_feat, content_skips, level)
 
-        return content_feat
+        return content_feat.clamp(0.0, 1.0)
