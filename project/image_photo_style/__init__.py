@@ -46,17 +46,6 @@ def get_model():
     return model, device
 
 
-def model_forward(model, device, content_tensor, style_tensor, multi_times=8):
-    # zeropad for model
-    H, W = content_tensor.size(2), content_tensor.size(3)
-    if H % multi_times != 0 or W % multi_times != 0:
-        content_tensor = todos.data.zeropad_tensor(content_tensor, times=multi_times)
-
-    output_tensor = todos.model.two_forward(model, device, content_tensor, style_tensor)
-
-    return output_tensor[:, :, 0:H, 0:W]
-
-
 def image_predict(input_files, style_file, output_dir):
     # Create directory to store result
     todos.data.mkdir(output_dir)
@@ -77,10 +66,12 @@ def image_predict(input_files, style_file, output_dir):
         content_tensor = todos.data.load_tensor(filename)
         B, C, H, W = content_tensor.shape
 
-        predict_tensor = model_forward(model, device, content_tensor, style_tensor)
+        predict_tensor = todos.model.two_forward(model, device, content_tensor, style_tensor)
         output_file = f"{output_dir}/{os.path.basename(filename)}"
 
         SB, SC, SH, SW = style_tensor.shape
         if SH != H or SW != W:
             style_tensor = F.interpolate(style_tensor, size=(H, W), mode="bilinear", align_corners=False)
         todos.data.save_tensor([content_tensor, style_tensor, predict_tensor], output_file)
+
+    todos.model.reset_device()

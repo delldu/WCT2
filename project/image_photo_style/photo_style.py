@@ -13,6 +13,7 @@
 import torch
 import torch.nn as nn
 from typing import List, Dict
+import torch.nn.functional as F
 
 import numpy as np
 import pdb
@@ -309,7 +310,7 @@ class WCT2(nn.Module):
 
         return feats
 
-    def forward(self, content, style):
+    def forward_x(self, content, style):
         H, W = style.size(2), style.size(3)
         if H % 8 != 0 or W % 8 != 0:
             H = 8 * (H // 8)
@@ -335,3 +336,52 @@ class WCT2(nn.Module):
             content_feat = self.decoder.decode(content_feat, content_skips, level)
 
         return content_feat.clamp(0.0, 1.0)
+
+    def forward(self, x1, x2):
+        # Define max GPU/CPU memory -- 8G
+        max_h = 1024
+        max_W = 1024
+        multi_times = 8
+
+        # Need Resize ?
+        B1, C1, H1, W1 = x1.size()
+        if H1 > max_h or W1 > max_W:
+            s = min(max_h / H1, max_W / W1)
+            SH, SW = int(s * H1), int(s * W1)
+            resize_x1 = F.interpolate(x1, size=(SH, SW), mode="bilinear", align_corners=False)
+        else:
+            resize_x1 = x1
+
+        B2, C2, H2, W2 = x2.size()
+        if H2 > max_h or W2 > max_W:
+            s = min(max_h / H2, max_W / W2)
+            SH, SW = int(s * H2), int(s * W2)
+            resize_x2 = F.interpolate(x2, size=(SH, SW), mode="bilinear", align_corners=False)
+        else:
+            resize_x2 = x2
+
+        # Need Pad ?
+        PH1, PW1 = resize_x1.size(2), resize_x1.size(3)
+        if PH1 % multi_times != 0 or PW1 % multi_times != 0:
+            r_pad = multi_times - (PW1 % multi_times)
+            b_pad = multi_times - (PH1 % multi_times)
+            resize_pad_x1 = F.pad(resize_x1, (0, r_pad, 0, b_pad), mode="replicate")
+        else:
+            resize_pad_x1 = resize_x1
+
+        PH2, PW2 = resize_x2.size(2), resize_x2.size(3)
+        if PH2 % multi_times != 0 or PW2 % multi_times != 0:
+            r_pad = multi_times - (PW2 % multi_times)
+            b_pad = multi_times - (PH2 % multi_times)
+            resize_pad_x2 = F.pad(resize_x2, (0, r_pad, 0, b_pad), mode="replicate")
+        else:
+            resize_pad_x2 = resize_x2
+
+        y = self.forward_x(resize_pad_x1, resize_pad_x2)
+        del resize_pad_x1, resize_x1, resize_pad_x2, resize_x2  # Release memory !!!
+
+        y = y[:, :, 0:PH1, 0:PW1]  # Remove Pads
+        if PH1 != H1 or PW1 != W1:
+            y = F.interpolate(y, size=(H1, W1), mode="bilinear", align_corners=False)
+
+        return y
