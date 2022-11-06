@@ -22,7 +22,7 @@ from . import photo_style
 import pdb
 
 
-def get_model():
+def get_photo_style_model():
     """Create model."""
 
     model_path = "models/image_photo_style.pth"
@@ -51,7 +51,7 @@ def image_predict(input_files, style_file, output_dir):
     todos.data.mkdir(output_dir)
 
     # load model
-    model, device = get_model()
+    model, device = get_photo_style_model()
 
     # load files
     image_filenames = todos.data.load_files(input_files)
