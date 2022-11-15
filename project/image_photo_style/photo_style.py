@@ -292,7 +292,7 @@ class WaveDecoder(nn.Module):
 class WCT2(nn.Module):
     def __init__(self):
         super(WCT2, self).__init__()
-        # Define max GPU/CPU memory -- 8G
+        # Define max GPU/CPU memory -- GPU 9G, 460ms
         self.MAX_H = 1024
         self.MAX_W = 1024
         self.MAX_TIMES = 8
